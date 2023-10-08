@@ -7,19 +7,14 @@
 #include "cJSON.h"
 #include "cJSON.c"
 
-/* #include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <pthread.h> */
+/* Funções relacionadas ao banco de dados */
+MYSQL * getConnection();
+int dbWrite(MYSQL *connection, int lenght, cJSON *dataAddressArray);
+int dbRead(MYSQL *connection, int rType, cJSON *dataAddressArray);
+int checkParse (cJSON *msg);
+void erro(MYSQL *connection);
 
-MYSQL * obterConexao();
-//void inserir(MYSQL *conexao, int id, int deviceId, time_t horario, float longitude, float latitude, float acx, float acy, float acz);
-//int inserir();
-void erro(MYSQL *conexao);
-void dbRead(MYSQL *conexao);
-MYSQL *dbConnection = obterConexao();
+MYSQL *dbConnection;
 
 static const char *s_http_addr = "http://127.0.0.1:8000";    // HTTP port
 static const char *s_https_addr = "https://127.0.0.1:443";  // HTTPS port
@@ -44,19 +39,11 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
     else if(ev == MG_EV_HTTP_MSG) { // Identifies HTTP connection
         
         struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-        //MYSQL *dbConnection = (MYSQL *) fn_data; 
         const char *method = hm->method.ptr;
+        cJSON *root, *values[4];
+
 
         printf("\n\t...message...\n%s\n", hm->message.ptr);
-
-        //printf("\n\t.. value headers[1].ptr %s\n", hm->headers[1].value.ptr);
-        /* printf("\n\t..method.ptr %s\n", hm->method.ptr);
-        printf("\t..uri.ptr %s\n", hm->uri.ptr); */
-
-        /* printf("\t..query.ptr %s\n", hm->query.ptr);
-        printf("\t..proto.ptr %s\n", hm->proto.ptr);
-        printf("\t..body.ptr %s\n", hm->body.ptr);
-        printf("\t..message.ptr %s\n", hm->message.ptr); */
 
         //rota --- /api/user
         if(mg_http_match_uri(hm, "/api/user")){
@@ -70,49 +57,37 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                     mg_http_reply(c, 200, "", "{\"result\": \"GETEI no switch \"}\n");
                     break;
                 
-                case 'P': // POST
-                    //printf("registrar user (name, email, password\n");
-                    cJSON *root = cJSON_Parse(hm->body.ptr);
-                    cJSON *values[4];
+                case 'P': // POST - Registrar usuário
+                    root = cJSON_Parse(hm->body.ptr);
 
                     if (checkParse(root) == 0) {
                         return;
                     }
 
-                    cJSON *values[0] = cJSON_GetObjectItem(root, "name");
-                    //cJSON *nameItem = cJSON_GetObjectItem(root, "name");
-                    cJSON *values[1] = cJSON_GetObjectItem(root, "email");
-                    //cJSON *emailItem = cJSON_GetObjectItem(root, "email");
-                    cJSON *values[2] = cJSON_GetObjectItem(root, "password");
-                    //cJSON *passwordItem = cJSON_GetObjectItem(root, "password");
+                    values[0] = cJSON_GetObjectItem(root, "name");
 
-                   /*  if (nameItem->type == cJSON_String) {
-                        //values[0] = &nameItem;
-                        //values[0] = &(nameItem->valuestring);
-                        values[0] = nameItem->valuestring;
-                    }
-                    if (emailItem->type == cJSON_String) {
-                        values[1] = emailItem->valuestring;
-                    }
-                    if (passwordItem->type == cJSON_String) {
-                        values[2] = passwordItem->valuestring;
-                    } */
+                    values[1] = cJSON_GetObjectItem(root, "email");
 
+                    values[2] = cJSON_GetObjectItem(root, "password");
+                    
                     // libera a memória alocada para o objeto cJSON
                     cJSON_Delete(root);
 
                     //consultar banco de dados para ver se já existe conta com o email informado
-                    //se não existe conta criada com o email passado, prossegue com o registro
-                    if () {
+                    //se não existe conta criada com o email informado, prossegue com o registro
+                    if (dbRead(dbConnection, 1, values) == 0) {
+                        
+                        values[3] = itoa(generateToken());
 
+                        // insere os dados no banco
+                        if(dbWrite(dbConnection, 4, values) == 0){
+                            printf("Usuário registrado com sucesso!\n");
+                            //sucesso, reply token
+                        }
                     }
                     else{
-                        values[3] = itoa(generateToken());
-                    }
-
-                    // insere os dados no banco
-                    if(inserir(dbConnection, 4, values) == 0){
-                        //sucesso, reply token
+                        printf("Já existe conta registrada com o email informado!\n");
+                        //reply alguma coisa
                     }
                     
                     //mg_http_reply(c, 200, "", "{\"result\": \"POSTEI o resource\"}\n");
@@ -180,7 +155,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                     cJSON_Delete(root);
 
                     //insere os dados no banco
-                    inserir(dbConnection, 1, 1, (time_t) 0, 88.0, 99.0, 0.0, 1.0, 2.0);
+                    //dbWrite(dbConnection, 1, 1, (time_t) 0, 88.0, 99.0, 0.0, 1.0, 2.0);
 
                     mg_http_reply(c, 200, "", "{\"result\": \"Dados JSON recebidos com sucesso\"}\n");
             }
@@ -199,18 +174,18 @@ int checkParse (cJSON *msg) {
     else return 1;
 }
 
-long int generateToken(){
+int generateToken(){
     srand((unsigned)time(NULL));
     return rand();
 }
 
-void erro(MYSQL *conexao){
-    fprintf(stderr, "\n%s\n", mysql_error(conexao));
-    mysql_close(conexao);
+void erro(MYSQL *connection){
+    fprintf(stderr, "\n%s\n", mysql_error(connection));
+    mysql_close(connection);
     exit(1);
 }
 
-MYSQL * obterConexao(){  
+MYSQL * getConnection(){  
   MYSQL *conexao;
     MYSQL_RES *res;
     MYSQL_ROW row;
@@ -250,7 +225,7 @@ MYSQL * obterConexao(){
 }
 
 // cJSON *dataArray
-int inserir(MYSQL *connection, int lenght, cJSON *dataAddressArray){
+int dbWrite(MYSQL *connection, int lenght, cJSON *dataAddressArray){
 
     char query[250];
 
@@ -263,7 +238,8 @@ int inserir(MYSQL *connection, int lenght, cJSON *dataAddressArray){
             //sprintf(query, "INSERT INTO device(MAC, user.id) VALUES ('%s', '%s');", data[0], data[1]);
 
         // user register (name, email, password)
-        case 3:
+        case 4:
+            printf("cheguei no dbWrite 4\n");
             //sprintf(query, "INSERT INTO user(name, email, password) VALUES ('%s', '%s', '%s');", data[0], data[1], data[2]);
     
         // data register (device.id, dateTime, longitude, latitude, acx, acy, acz);
@@ -272,85 +248,76 @@ int inserir(MYSQL *connection, int lenght, cJSON *dataAddressArray){
     }
 
     printf("%s\n", query);
-    if (mysql_query(conexao, query))
-    {
+    if (mysql_query(connection, query)) {
+
         printf("\nErro ao inserir no banco de dados!\n");
-        erro(conexao);
+        erro(connection);
         return 1;
     }
-    else
-    {
+    else {
+
         printf("\nDados inseridos com sucesso!\n");
         return 0;
     }   
 }
 
-/* void inserir(MYSQL *conexao, int id, int deviceId, char* horario, float longitude, float latitude, float acx, float acy, float acz) {
-    
-    struct tm *p;
-    char query[250], datahora[50];
-    time_t teste;
+int dbRead(MYSQL *connection, int rType, cJSON **dataAddressArray) {
 
-    time(&teste);
-
-    p = localtime(&teste);
-
-    //mySQL datetime format: YYYY-MM-DD hh:mm:ss
-    sprintf(datahora, "%d-%d-%d %d:%d:%d", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
-
-    
-    sprintf(query, "INSERT INTO data(id, device.id, dateTime, longitude, latitude, acx, acy, acz) VALUES('%d', '%d', '%s', '%f', '%f', '%f', '%f', '%f');", id, deviceId, datahora, longitude, latitude, acx, acy, acz);
-    printf("%s\n", query);
-    if (mysql_query(conexao, query))
-    {
-        printf("\nErro ao inserir no banco de dados!\n");
-        erro(conexao);
-    }
-    else
-    {
-        printf("\nDados inseridos com sucesso!\n");
-    }
-} */
-
-void dbRead(MYSQL *conexao, int rType, cJSON *dataAddressArray) {
-
-    MYSQL_RES *resultado;
+    MYSQL_RES *answer;
     MYSQL_ROW row;
+    char query[250];
 
-    switch (rType){
+    // switch utilizado para montagem da query
+    switch (rType) {
 
         case 1:
-            //sprintf(query, "SELECT id FROM user WHERE email = '%s'", emailUserRegister);
-            if (mysql_query(conexao, "SELECT id FROM user WHERE email = ")) {
-
-            }
+            sprintf(query, "SELECT id FROM user WHERE email = '%s';", dataAddressArray[1]);
+            break;
+            
     }
-    if (mysql_query(conexao, "SELECT * FROM disp")){
+
+    if (mysql_query(connection, query)) {
+
+        printf("\nErro ao consultar no banco de dados!\n");
+        erro(connection);
+        return 1;
+    }
+    else {
+
+        printf("\nConsulta realizada com sucesso!\n");
+    }
+
+    /* if (mysql_query(connection, "SELECT * FROM disp")){
         printf("Erro na leitura!\n");
-        erro(conexao);
-    }
-    resultado = mysql_store_result(conexao);
+        erro(connection);
+    } */
+
+    answer = mysql_store_result(connection);
     
-    if (resultado == NULL){
+    if (answer == NULL) {
+
         printf("Retorno nulo!\n");
-        erro(conexao);
+        erro(connection);
+    }
+    else {
+
     }
 
-    while ((row = mysql_fetch_row(resultado)) != NULL){
-        printf("\nId: %s\n", row[0]);
-        printf("Data hora: %s\n", row[1]);
-        printf("Longitude: %s\n", row[2]);
-        printf("Latitude: %s\n", row[3]);
-        printf("Acx: %s, Acy: %s, Acz: %s\n", row[4], row[5], row[6]);
-    }
-    mysql_free_result(resultado);
+
+    /* row = mysql_fetch_row(answer);
+
+    for (int i = 0; ) {
+
+    } */
+    
+    mysql_free_result(answer);
 }
 
 int main(void) {
     struct mg_mgr mgr;                            // Event manager
     mg_log_set(MG_LL_DEBUG);                      // Set log level
 
-    //MYSQL* connection = obterConexao();           // Connect to database
+    dbConnection = getConnection();           // Connect to database
    
     mg_mgr_init(&mgr);                            // Initialise event manager
     
