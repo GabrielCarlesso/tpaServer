@@ -9,8 +9,8 @@
 
 /* Funções relacionadas ao banco de dados */
 MYSQL * getConnection();
-int dbWrite(MYSQL *connection, int lenght, cJSON *dataAddressArray[]);
-int dbRead(MYSQL *connection, int rType, cJSON *dataAddressArray[]);
+int dbWrite(MYSQL *connection, int lenght, cJSON *data);
+int dbRead(MYSQL *connection, int rType, cJSON *data);
 int checkParse (cJSON *msg);
 long int generateToken();
 void erro(MYSQL *connection);
@@ -42,7 +42,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
         struct mg_http_message *hm = (struct mg_http_message *) ev_data;
         const char *method = hm->method.ptr;
         char tokenStr[32];
-        cJSON *root, *values[4], *nameItem, *emailItem, *passwordItem;
+        cJSON *root;
 
 
         printf("\n\t...message...\n%s\n", hm->message.ptr);
@@ -64,34 +64,28 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
 
                     if (checkParse(root) == 0) {
                         return;
-                    }
-                    //printf("teste: %s\n", cJSON_GetObjectItem(root, "name")->valuestring);
-                    values[0] = cJSON_GetObjectItem(root, "name");;
-
-                    values[1] = cJSON_GetObjectItem(root, "email");
-
-                    values[2] = cJSON_GetObjectItem(root, "password");
-                    
-                    // inicializa o cJSON como uma string vazia
-                    values[3] = cJSON_CreateString(""); 
+                    } 
                     
                     // libera a memória alocada para o objeto cJSON
-                    cJSON_Delete(root);
+                    //cJSON_Delete(root);
 
                     // registra usuário se não houver existente com o email informado
-                    if (dbRead(dbConnection, 1, values) == 0) {
+                    if (dbRead(dbConnection, 1, root) == 0) {
                         
-                        // converte o token em uma string
+                        // converte o token em uma string e adiciona ao objeto cJSON root
                         snprintf(tokenStr, sizeof(tokenStr), "%ld", generateToken());
+                        cJSON_AddStringToObject(root, "token", tokenStr);
 
                         // insere os dados no banco
-                        if(dbWrite(dbConnection, 4, values) == 0){
+                        if(dbWrite(dbConnection, 4, root) == 0){
                             printf("Usuário registrado com sucesso!\n");
+                            mg_http_reply(c, 200, "", "{\"result\": \"Usuário registrado com sucesso!\"}\n");
                             //sucesso, reply token
                         }
                     }
                     else{
                         printf("Já existe conta registrada com o email informado!\n");
+                        mg_http_reply(c, 200, "", "{\"result\": \"Já existe conta registrada com o email informado!\"}\n");
                         //reply alguma coisa
                     }
                     break;
@@ -234,7 +228,7 @@ MYSQL * getConnection(){
 }
 
 // cJSON *dataArray
-int dbWrite(MYSQL *connection, int lenght, cJSON *dataAddressArray[]){
+int dbWrite(MYSQL *connection, int lenght, cJSON *data){
 
     char query[250];
 
@@ -252,7 +246,10 @@ int dbWrite(MYSQL *connection, int lenght, cJSON *dataAddressArray[]){
             printf("cheguei no dbWrite 4\n");
             //printf("teste: %s\n", dataAddressArray[0]->valuestring);
             sprintf(query, "INSERT INTO user(name, email, password, token) VALUES ('%s', '%s', '%s', '%s');", 
-                dataAddressArray[0]->valuestring, dataAddressArray[1]->valuestring, dataAddressArray[2]->valuestring, dataAddressArray[3]->valuestring);
+                cJSON_GetObjectItem(data, "name")->valuestring, 
+                cJSON_GetObjectItem(data, "email")->valuestring, 
+                cJSON_GetObjectItem(data, "password")->valuestring,
+                cJSON_GetObjectItem(data, "token")->valuestring);
             break;
     
         // data register (device.id, dateTime, longitude, latitude, acx, acy, acz);
@@ -275,7 +272,7 @@ int dbWrite(MYSQL *connection, int lenght, cJSON *dataAddressArray[]){
     }   
 }
 
-int dbRead(MYSQL *connection, int rType, cJSON *dataAddressArray[]) {
+int dbRead(MYSQL *connection, int rType, cJSON *data) {
 
     MYSQL_RES *answer;
     MYSQL_ROW row;
@@ -285,7 +282,7 @@ int dbRead(MYSQL *connection, int rType, cJSON *dataAddressArray[]) {
     switch (rType) {
 
         case 1:
-            sprintf(query, "SELECT id FROM user WHERE email = '%s';", dataAddressArray[1]->valuestring);
+            sprintf(query, "SELECT id FROM user WHERE email = '%s';", cJSON_GetObjectItem(data, "email")->valuestring);
             break;
             
     }
