@@ -42,15 +42,17 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
         struct mg_http_message *hm = (struct mg_http_message *) ev_data;
         const char *method = hm->method.ptr;
         char tokenStr[32];
-        cJSON *root;
+        cJSON *root = cJSON_Parse(hm->body.ptr);
+
+        //root = cJSON_Parse(hm->body.ptr);
 
 
         printf("\n\t...message...\n%s\n", hm->message.ptr);
 
         //rota --- /api/user
-        if(mg_http_match_uri(hm, "/api/user")){
+        if(mg_http_match_uri(hm, "/api/user")) {
 
-            switch(method[0]){
+            switch(method[0]) {
 
                 case 'G': // GET
                     printf("get user info (parâmetro user.id)\n");
@@ -60,7 +62,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                     break;
                 
                 case 'P': // POST - Registrar usuário
-                    root = cJSON_Parse(hm->body.ptr);
+                    //root = cJSON_Parse(hm->body.ptr);
 
                     if (checkParse(root) == 0) {
                         return;
@@ -88,9 +90,8 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         mg_http_reply(c, 200, "", "{\"result\": \"Já existe conta registrada com o email informado!\"}\n");
                         //reply alguma coisa
                     }
+                    cJSON_Delete(root);
                     break;
-                    
-                    //mg_http_reply(c, 200, "", "{\"result\": \"POSTEI o resource\"}\n");
 
                 case 'D': //DELETE
                     printf("deletar usuario e todos os dados associados\n");
@@ -102,10 +103,25 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
         //rota --- /api/user/device
         else if(mg_http_match_uri(hm, "/api/user/device")){
 
-            switch(method[0]){
+            switch(method[0]) {
                 case 'G': //GET
                     printf("get all devices from user.id\n");
                     mg_http_reply(c, 200, "", "{\"result\": \"GETEI a data\"}\n");
+                    break;
+            }
+        }
+        else if(mg_http_match_uri(hm, "/api/device")) {
+
+            switch(method[0]) {
+                
+                case 'D':   // delete device
+                    break;
+                
+                case 'G':   // get device info
+                    break;
+                
+                case 'P':   // device register
+                    
                     break;
             }
         }
