@@ -7,19 +7,15 @@
 #include "cJSON.h"
 #include "cJSON.c"
 
-/* #include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <pthread.h> */
+/* Funções relacionadas ao banco de dados */
+MYSQL * getConnection();
+int dbWrite(MYSQL *connection, int lenght, cJSON *data);
+int dbRead(MYSQL *connection, int rType, cJSON *data);
+int checkParse (cJSON *msg);
+long int generateToken();
+void erro(MYSQL *connection);
 
-MYSQL * obterConexao();
-//void inserir(MYSQL *conexao, int id, int deviceId, time_t horario, float longitude, float latitude, float acx, float acy, float acz);
-//int inserir();
-void erro(MYSQL *conexao);
-void dbRead(MYSQL *conexao);
-MYSQL *dbConnection = obterConexao();
+MYSQL *dbConnection;
 
 static const char *s_http_addr = "http://127.0.0.1:8000";    // HTTP port
 static const char *s_https_addr = "https://127.0.0.1:443";  // HTTPS port
@@ -44,24 +40,20 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
     else if(ev == MG_EV_HTTP_MSG) { // Identifies HTTP connection
         
         struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-        //MYSQL *dbConnection = (MYSQL *) fn_data; 
         const char *method = hm->method.ptr;
+        char tokenStr[32];
+        int id;
+        cJSON *root = cJSON_Parse(hm->body.ptr);
+
+        //root = cJSON_Parse(hm->body.ptr);
+
 
         printf("\n\t...message...\n%s\n", hm->message.ptr);
 
-        //printf("\n\t.. value headers[1].ptr %s\n", hm->headers[1].value.ptr);
-        /* printf("\n\t..method.ptr %s\n", hm->method.ptr);
-        printf("\t..uri.ptr %s\n", hm->uri.ptr); */
-
-        /* printf("\t..query.ptr %s\n", hm->query.ptr);
-        printf("\t..proto.ptr %s\n", hm->proto.ptr);
-        printf("\t..body.ptr %s\n", hm->body.ptr);
-        printf("\t..message.ptr %s\n", hm->message.ptr); */
-
         //rota --- /api/user
-        if(mg_http_match_uri(hm, "/api/user")){
+        if(mg_http_match_uri(hm, "/api/user")) {
 
-            switch(method[0]){
+            switch(method[0]) {
 
                 case 'G': // GET
                     printf("get user info (parâmetro user.id)\n");
@@ -70,66 +62,83 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                     mg_http_reply(c, 200, "", "{\"result\": \"GETEI no switch \"}\n");
                     break;
                 
-                case 'P': // POST
-                    //printf("registrar user (name, email, password\n");
-                    cJSON *root = cJSON_Parse(hm->body.ptr);
-                    cJSON *values[4];
+                case 'P': // POST - Registrar usuário
 
                     if (checkParse(root) == 0) {
                         return;
-                    }
+                    } 
+                     
+                    // converte o token em uma string e adiciona ao objeto cJSON root
+                    snprintf(tokenStr, sizeof(tokenStr), "%ld", generateToken());
+                    cJSON_AddStringToObject(root, "token", tokenStr);
 
-                    cJSON *values[0] = cJSON_GetObjectItem(root, "name");
-                    //cJSON *nameItem = cJSON_GetObjectItem(root, "name");
-                    cJSON *values[1] = cJSON_GetObjectItem(root, "email");
-                    //cJSON *emailItem = cJSON_GetObjectItem(root, "email");
-                    cJSON *values[2] = cJSON_GetObjectItem(root, "password");
-                    //cJSON *passwordItem = cJSON_GetObjectItem(root, "password");
-
-                   /*  if (nameItem->type == cJSON_String) {
-                        //values[0] = &nameItem;
-                        //values[0] = &(nameItem->valuestring);
-                        values[0] = nameItem->valuestring;
-                    }
-                    if (emailItem->type == cJSON_String) {
-                        values[1] = emailItem->valuestring;
-                    }
-                    if (passwordItem->type == cJSON_String) {
-                        values[2] = passwordItem->valuestring;
-                    } */
-
-                    // libera a memória alocada para o objeto cJSON
-                    cJSON_Delete(root);
-
-                    //consultar banco de dados para ver se já existe conta com o email informado
-                    //se não existe conta criada com o email passado, prossegue com o registro
-                    if () {
-
-                    }
-                    else{
-                        values[3] = itoa(generateToken());
-                    }
-
-                    // insere os dados no banco
-                    if(inserir(dbConnection, 4, values) == 0){
+                    // registra usuário se não houver existente com o email informado
+                    if(dbWrite(dbConnection, 1, root) == 1){
+                        printf("Usuário registrado com sucesso!\n");
+                        mg_http_reply(c, 200, "", "{\"result\": \"Usuário registrado com sucesso!\"}\n");
                         //sucesso, reply token
                     }
-                    
-                    //mg_http_reply(c, 200, "", "{\"result\": \"POSTEI o resource\"}\n");
+                    else{
+                        printf("Já existe conta registrada com o email informado!\n");
+                        mg_http_reply(c, 200, "", "{\"result\": \"Já existe conta registrada com o email informado!\"}\n");
+                        //reply alguma coisa
+                    }
+                    cJSON_Delete(root);
+                    break;
 
                 case 'D': //DELETE
                     printf("deletar usuario e todos os dados associados\n");
                     // ...
                     mg_http_reply(c, 200, "", "{\"result\": \"olá Kraemer\"}\n");
+                    break;
             }
         }
         //rota --- /api/user/device
         else if(mg_http_match_uri(hm, "/api/user/device")){
 
-            switch(method[0]){
+            switch(method[0]) {
                 case 'G': //GET
                     printf("get all devices from user.id\n");
                     mg_http_reply(c, 200, "", "{\"result\": \"GETEI a data\"}\n");
+                    break;
+            }
+        }
+        else if(mg_http_match_uri(hm, "/api/device")) {
+
+            switch(method[0]) {
+                
+                case 'D':   // delete device
+                    break;
+                
+                case 'G':   // get device info
+                    break;
+                
+                case 'P':   // device register
+
+                    if (checkParse(root) == 0) {
+                        return;
+                    } 
+                    
+                    // verifica qual usuário possui o token informado
+                    id = dbRead(dbConnection, 2, root);
+                    
+                    if(id != 0){
+                        
+                        cJSON_AddNumberToObject(root, "user.id", id);
+
+                        // insere os dados no banco
+                        if(dbWrite(dbConnection, 2, root) == 1){
+
+                        }
+                        else {
+                            printf("Já existe dispositivo registrado com o MAC informado!\n");
+                            mg_http_reply(c, 200, "", "{\"result\": \"Já existe conta registrada com o email informado!\"}\n");
+                            //reply alguma coisa
+                        }
+                    }
+                    
+                    cJSON_Delete(root);
+                    break;
             }
         }
         else if(mg_http_match_uri(hm, "/api/data")){
@@ -139,7 +148,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                 case 'P':
                     printf("Recebido JSON: %.*s\n", (int)hm->body.len, hm->body.ptr); //debug
                 
-                    cJSON *root = cJSON_Parse(hm->body.ptr);
+                    root = cJSON_Parse(hm->body.ptr);
 
                     if (checkParse(root) == 0) {
                         return;
@@ -180,9 +189,10 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                     cJSON_Delete(root);
 
                     //insere os dados no banco
-                    inserir(dbConnection, 1, 1, (time_t) 0, 88.0, 99.0, 0.0, 1.0, 2.0);
+                    //dbWrite(dbConnection, 1, 1, (time_t) 0, 88.0, 99.0, 0.0, 1.0, 2.0);
 
                     mg_http_reply(c, 200, "", "{\"result\": \"Dados JSON recebidos com sucesso\"}\n");
+                    break;
             }
         }
     }
@@ -204,13 +214,13 @@ long int generateToken(){
     return rand();
 }
 
-void erro(MYSQL *conexao){
-    fprintf(stderr, "\n%s\n", mysql_error(conexao));
-    mysql_close(conexao);
+void erro(MYSQL *connection){
+    fprintf(stderr, "\n%s\n", mysql_error(connection));
+    mysql_close(connection);
     exit(1);
 }
 
-MYSQL * obterConexao(){  
+MYSQL * getConnection(){  
   MYSQL *conexao;
     MYSQL_RES *res;
     MYSQL_ROW row;
@@ -250,107 +260,112 @@ MYSQL * obterConexao(){
 }
 
 // cJSON *dataArray
-int inserir(MYSQL *connection, int lenght, cJSON *dataAddressArray){
+int dbWrite(MYSQL *connection, int wType, cJSON *data){
 
     char query[250];
 
     // lenght representa a quantidade de argumentos que serão inseridos no bando de dados
-    switch (lenght){
+    switch (wType){
         
+        // user register (name, email, password)
+        case 1:
+            printf("cheguei no dbWrite 4\n");
+            //printf("teste: %s\n", dataAddressArray[0]->valuestring);
+            sprintf(query, "INSERT INTO user(name, email, password, token) VALUES ('%s', '%s', '%s', '%s');", 
+                cJSON_GetObjectItem(data, "name")->valuestring, 
+                cJSON_GetObjectItem(data, "email")->valuestring, 
+                cJSON_GetObjectItem(data, "password")->valuestring,
+                cJSON_GetObjectItem(data, "token")->valuestring);
+            break;
+    
         // device register (MAC, user.id)
         case 2:
             //int userId = getUserId;
             //sprintf(query, "INSERT INTO device(MAC, user.id) VALUES ('%s', '%s');", data[0], data[1]);
+            break;
 
-        // user register (name, email, password)
-        case 3:
-            //sprintf(query, "INSERT INTO user(name, email, password) VALUES ('%s', '%s', '%s');", data[0], data[1], data[2]);
-    
         // data register (device.id, dateTime, longitude, latitude, acx, acy, acz);
         case 7:
             //sprintf(query, "INSERT INTO data(device.id, dateTime, longitude, latitude, acx, acy, acz) VALUES ('%i', '%s', '%f', '%f', '%f', '%f', '%f');");
+            break;
     }
 
     printf("%s\n", query);
-    if (mysql_query(conexao, query))
-    {
+    if (mysql_query(connection, query)) {
+
         printf("\nErro ao inserir no banco de dados!\n");
-        erro(conexao);
-        return 1;
-    }
-    else
-    {
-        printf("\nDados inseridos com sucesso!\n");
+        erro(connection);
         return 0;
+    }
+    else {
+
+        printf("\nDados inseridos com sucesso!\n");
+        return 1;
     }   
 }
 
-/* void inserir(MYSQL *conexao, int id, int deviceId, char* horario, float longitude, float latitude, float acx, float acy, float acz) {
-    
-    struct tm *p;
-    char query[250], datahora[50];
-    time_t teste;
+int dbRead(MYSQL *connection, int rType, cJSON *data) {
 
-    time(&teste);
-
-    p = localtime(&teste);
-
-    //mySQL datetime format: YYYY-MM-DD hh:mm:ss
-    sprintf(datahora, "%d-%d-%d %d:%d:%d", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
-
-    
-    sprintf(query, "INSERT INTO data(id, device.id, dateTime, longitude, latitude, acx, acy, acz) VALUES('%d', '%d', '%s', '%f', '%f', '%f', '%f', '%f');", id, deviceId, datahora, longitude, latitude, acx, acy, acz);
-    printf("%s\n", query);
-    if (mysql_query(conexao, query))
-    {
-        printf("\nErro ao inserir no banco de dados!\n");
-        erro(conexao);
-    }
-    else
-    {
-        printf("\nDados inseridos com sucesso!\n");
-    }
-} */
-
-void dbRead(MYSQL *conexao, int rType, cJSON *dataAddressArray) {
-
-    MYSQL_RES *resultado;
+    MYSQL_RES *answer;
     MYSQL_ROW row;
+    char query[250];
+    int num_fields;
 
-    switch (rType){
+    // switch utilizado para montagem da query
+    switch (rType) {
 
         case 1:
-            //sprintf(query, "SELECT id FROM user WHERE email = '%s'", emailUserRegister);
-            if (mysql_query(conexao, "SELECT id FROM user WHERE email = ")) {
+            sprintf(query, "SELECT id FROM user WHERE email = '%s';", cJSON_GetObjectItem(data, "email")->valuestring);
+            break;
 
-            }
+        case 2:
+            sprintf(query, "SELECT id FROM user WHERE token = '%s';", cJSON_GetObjectItem(data, "token")->valuestring);
+            break;
+            
     }
-    if (mysql_query(conexao, "SELECT * FROM disp")){
-        printf("Erro na leitura!\n");
-        erro(conexao);
+
+    if (mysql_query(connection, query)) {
+
+        printf("\nErro ao consultar no banco de dados!\n");
+        erro(connection);
+        return 0;
     }
-    resultado = mysql_store_result(conexao);
+
+    printf("\nConsulta realizada com sucesso!\n");
     
-    if (resultado == NULL){
+    answer = mysql_store_result(connection);
+    
+    if (answer == NULL) {
+
         printf("Retorno nulo!\n");
-        erro(conexao);
+        erro(connection);
+        return 0;
+    }
+    else {
+        num_fields = mysql_num_fields(answer);
+
+        if (rType == 2) {
+            row = mysql_fetch_row(answer);
+            printf("id: %s\n", row[0]);
+            return (atoi(row[0]));
+        }
     }
 
-    while ((row = mysql_fetch_row(resultado)) != NULL){
-        printf("\nId: %s\n", row[0]);
-        printf("Data hora: %s\n", row[1]);
-        printf("Longitude: %s\n", row[2]);
-        printf("Latitude: %s\n", row[3]);
-        printf("Acx: %s, Acy: %s, Acz: %s\n", row[4], row[5], row[6]);
-    }
-    mysql_free_result(resultado);
+    /* row = mysql_fetch_row(answer);
+
+    for (int i = 0; ) {
+
+    } */
+    
+    mysql_free_result(answer);
+    return (-1);
 }
 
 int main(void) {
     struct mg_mgr mgr;                            // Event manager
     mg_log_set(MG_LL_DEBUG);                      // Set log level
 
-    //MYSQL* connection = obterConexao();           // Connect to database
+    dbConnection = getConnection();           // Connect to database
    
     mg_mgr_init(&mgr);                            // Initialise event manager
     
