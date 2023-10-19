@@ -40,8 +40,9 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
     else if(ev == MG_EV_HTTP_MSG) { // Identifies HTTP connection
         
         struct mg_http_message *hm = (struct mg_http_message *) ev_data;
+        //struct mg_str *token = mg_http_get_header(hm, "Authorization");
         const char *method = hm->method.ptr;
-        char tokenStr[32];
+        //char tokenStr[32];
         int id;
         cJSON *root = cJSON_Parse(hm->body.ptr);
 
@@ -69,8 +70,8 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                     } 
                      
                     // converte o token em uma string e adiciona ao objeto cJSON root
-                    snprintf(tokenStr, sizeof(tokenStr), "%ld", generateToken());
-                    cJSON_AddStringToObject(root, "token", tokenStr);
+                    //snprintf(tokenStr, sizeof(tokenStr), "%ld", generateToken());
+                    cJSON_AddNumberToObject(root, "token", generateToken());
 
                     // registra usuário se não houver existente com o email informado
                     if(dbWrite(dbConnection, 1, root) == 1){
@@ -119,22 +120,35 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         return;
                     } 
                     
-                    // verifica qual usuário possui o token informado
-                    id = dbRead(dbConnection, 2, root);
+                    if(cJSON_GetObjectItem(root, "token")->valuestring != NULL){
+                        printf("dif de null");
                     
-                    if(id != 0){
+                        //cJSON_AddStringToObject(root, "token", token->ptr);
                         
-                        cJSON_AddNumberToObject(root, "user.id", id);
+                        // verifica qual usuário possui o token informado
+                        id = dbRead(dbConnection, 2, root);
+                    
+                        if(id != 0){
 
-                        // insere os dados no banco
-                        if(dbWrite(dbConnection, 2, root) == 1){
+                            printf("leu id: %i\n", id);
+                        
+                            cJSON_AddNumberToObject(root, "user.id", id);
 
+                            // insere os dados no banco
+                            if(dbWrite(dbConnection, 2, root) == 1){
+                                printf("Dispositivo registrado com sucesso!\n");
+                                mg_http_reply(c, 200, "", "{\"result\": \"Dispositivo registrado com sucesso!\"}\n");
+                            }
+                            else {
+                                mg_http_reply(c, 200, "", "{\"result\": \"Já existe dispositivo registrado com o MAC informado!\"}\n");
+                            }
                         }
                         else {
-                            printf("Já existe dispositivo registrado com o MAC informado!\n");
-                            mg_http_reply(c, 200, "", "{\"result\": \"Já existe conta registrada com o email informado!\"}\n");
-                            //reply alguma coisa
+                            mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
                         }
+                    }
+                    else {
+                        mg_http_reply(c, 200, "", "{\"result\": \"Token nulo!\"}\n");
                     }
                     
                     cJSON_Delete(root);
@@ -239,7 +253,7 @@ MYSQL * getConnection(){
     printf("Conexao realizada com sucesso!\n");
     
     /* send SQL query */
-    if (mysql_query(conexao, "show tables")) {
+    /* if (mysql_query(conexao, "show tables")) {
       fprintf(stderr, "%s\n", mysql_error(conexao));
       mysql_close(conexao);
       exit(1);
@@ -247,9 +261,9 @@ MYSQL * getConnection(){
     res = mysql_use_result(conexao);
 
     /* output table name */
-    printf("MySQL Tables in mysql database:\n");
+    /*printf("MySQL Tables in mysql database:\n");
     while ((row = mysql_fetch_row(res)) != NULL)
-      printf("%s \n", row[0]);
+      printf("%s \n", row[0]); */
 
     /* close connection 
     mysql_free_result(res);
@@ -267,21 +281,22 @@ int dbWrite(MYSQL *connection, int wType, cJSON *data){
     // lenght representa a quantidade de argumentos que serão inseridos no bando de dados
     switch (wType){
         
-        // user register (name, email, password)
+        // user register (name, email, password, token)
         case 1:
-            printf("cheguei no dbWrite 4\n");
-            //printf("teste: %s\n", dataAddressArray[0]->valuestring);
-            sprintf(query, "INSERT INTO user(name, email, password, token) VALUES ('%s', '%s', '%s', '%s');", 
+            printf("cheguei no dbWrite userRegister\n");
+            sprintf(query, "INSERT INTO user(name, email, password, token) VALUES ('%s', '%s', '%s', '%d');", 
                 cJSON_GetObjectItem(data, "name")->valuestring, 
                 cJSON_GetObjectItem(data, "email")->valuestring, 
                 cJSON_GetObjectItem(data, "password")->valuestring,
-                cJSON_GetObjectItem(data, "token")->valuestring);
+                cJSON_GetObjectItem(data, "token")->valueint);
             break;
     
         // device register (MAC, user.id)
         case 2:
-            //int userId = getUserId;
-            //sprintf(query, "INSERT INTO device(MAC, user.id) VALUES ('%s', '%s');", data[0], data[1]);
+            printf("cheguei no dbWrite deviceRegister\n");
+            sprintf(query, "INSERT INTO device(MAC, userID) VALUES ('%s', '%i');",
+                cJSON_GetObjectItem(data, "MAC")->valuestring,
+                cJSON_GetObjectItem(data, "user.id")->valueint);
             break;
 
         // data register (device.id, dateTime, longitude, latitude, acx, acy, acz);
@@ -306,10 +321,10 @@ int dbWrite(MYSQL *connection, int wType, cJSON *data){
 
 int dbRead(MYSQL *connection, int rType, cJSON *data) {
 
-    MYSQL_RES *answer;
+    MYSQL_RES *res;
     MYSQL_ROW row;
     char query[250];
-    int num_fields;
+    int value;
 
     // switch utilizado para montagem da query
     switch (rType) {
@@ -319,37 +334,42 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
             break;
 
         case 2:
+            // Agora você pode usar tokenValue na sua consulta SQL
             sprintf(query, "SELECT id FROM user WHERE token = '%s';", cJSON_GetObjectItem(data, "token")->valuestring);
             break;
             
     }
+    printf("query %s", query);
 
     if (mysql_query(connection, query)) {
-
         printf("\nErro ao consultar no banco de dados!\n");
         erro(connection);
         return 0;
     }
 
+    //printf("%s\n", query);
     printf("\nConsulta realizada com sucesso!\n");
     
-    answer = mysql_store_result(connection);
+    res = mysql_store_result(connection);
     
-    if (answer == NULL) {
-
+    if (res == NULL) {
+        printf("cheguei 2\t");
         printf("Retorno nulo!\n");
         erro(connection);
+        mysql_free_result(res);
         return 0;
     }
     else {
-        num_fields = mysql_num_fields(answer);
-
-        if (rType == 2) {
-            row = mysql_fetch_row(answer);
-            printf("id: %s\n", row[0]);
-            return (atoi(row[0]));
-        }
+        printf("cheguei 3\t");
+        row = mysql_fetch_row(res);
+        value = atoi(row[0]);
+        mysql_free_result(res);
+        return value;
+        
     }
+
+    //while ((row = mysql_fetch_row(res)) != NULL)
+     // printf("%s \n", row[0]); */
 
     /* row = mysql_fetch_row(answer);
 
@@ -357,7 +377,7 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
 
     } */
     
-    mysql_free_result(answer);
+    mysql_free_result(res);
     return (-1);
 }
 
