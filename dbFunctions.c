@@ -95,6 +95,8 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
     MYSQL_ROW row;
     char query[250];
     int value;
+    unsigned int num_fields, i;
+    unsigned long *lengths;
 
     // switch utilizado para montagem da query
     switch (rType) {
@@ -110,7 +112,12 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
         case 3:
             sprintf(query, "SELECT id FROM device WHERE userID = %i AND MAC = '%s';", 
                 cJSON_GetObjectItem(data, "userID")->valueint, 
-                cJSON_GetObjectItem(data, "MAC")->valuestring);  
+                cJSON_GetObjectItem(data, "MAC")->valuestring);
+            break;
+
+        case 4:
+            sprintf(query, "SELECT name, email FROM user WHERE id = %i;", cJSON_GetObjectItem(data, "userID")->valueint);
+            break;  
     }
     printf("query %s", query);
 
@@ -130,10 +137,25 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
         return 0;
     }
     else {
-        row = mysql_fetch_row(res);
-        value = atoi(row[0]);
-        mysql_free_result(res);
-        return value;
+        if (rType == 2 || rType == 3) {
+            row = mysql_fetch_row(res);
+            value = atoi(row[0]);
+            mysql_free_result(res);
+            return value;
+        }
+        else{
+            num_fields = mysql_num_fields(res);
+            
+            while ((row = mysql_fetch_row(res))) {
+                
+                lengths = mysql_fetch_lengths(res);
+                for(i = 0; i < num_fields; i++) {
+                    printf("[%.*s] ", (int) lengths[i],
+                        row[i] ? row[i] : "NULL");
+                }
+                printf("\n");
+            }
+        }
     }
     
     mysql_free_result(res);
