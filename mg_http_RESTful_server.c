@@ -1,7 +1,5 @@
 #include "mongoose.h"
 #include "mongoose.c"
-#include "cJSON.h"
-#include "cJSON.c"
 #include "dbFunctions.c"
 
 
@@ -39,11 +37,14 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
         char tokenStr[32];
         int id, deviceID;
         cJSON *root = cJSON_Parse(hm->body.ptr);
+        char *jsonString;
 
         printf("\n\t...message...\n%s\n", hm->message.ptr);
 
         if (checkParse(root) == 0) {
             mg_http_reply(c, 200, "", "{\"result\": \"Body da mensagem é nulo!\"}\n");
+            cJSON_Delete(root);
+            free(jsonString);
         } 
         else {
 
@@ -65,7 +66,11 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
 
                                 // consulta os dados do usuário
                                 if (dbRead(dbConnection, 4, root) != 0) {
-                                    mg_http_reply(c, 200, "", "{\"result\": \"Usuário encontrado!\"}\n");
+                                    cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
+                                    cJSON_DeleteItemFromObjectCaseSensitive(root, "userID");
+                                    jsonString = cJSON_Print(root);
+                                    mg_http_reply(c, 200, "Content-Type: application/json", jsonString);
+                                    free(jsonString);
                                 }
                                 else {
                                     mg_http_reply(c, 200, "", "{\"result\": \"Usuário não encontrado!\"}\n");
@@ -96,10 +101,30 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         cJSON_Delete(root);
                         break;
 
-                    case 'D': //DELETE
-                        printf("deletar usuario e todos os dados associados\n");
-                        // ...
-                        mg_http_reply(c, 200, "", "{\"result\": \"olá Kraemer\"}\n");
+                    case 'D':  // DELETE - Excluir usuário, dispositivos e dados associados
+                        
+                        if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
+                            
+                            // verifica qual usuário possui o token informado
+                            id = dbRead(dbConnection, 2, root);
+                        
+                            if (id != 0) {
+
+                                cJSON_AddNumberToObject(root, "userID", id);
+
+                                // consulta os dados do usuário
+                                if (dbDelete(dbConnection, 1, root) != 0) {
+                                    
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Usupario excluído com sucesso.\"}\n");
+                                }
+                                else {
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Falha ao excluir usuário.\"}\n");
+                                }
+                            }
+                            else {
+                                mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado.\"}\n");
+                            }
+                        }
 
                         cJSON_Delete(root);
                         break;
