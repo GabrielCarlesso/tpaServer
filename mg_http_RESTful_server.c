@@ -115,7 +115,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 // consulta os dados do usuário
                                 if (dbDelete(dbConnection, 1, root) != 0) {
                                     
-                                    mg_http_reply(c, 200, "", "{\"result\": \"Usupario excluído com sucesso.\"}\n");
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Usuário excluído com sucesso.\"}\n");
                                 }
                                 else {
                                     mg_http_reply(c, 200, "", "{\"result\": \"Falha ao excluir usuário.\"}\n");

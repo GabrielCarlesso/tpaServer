@@ -187,6 +187,4 @@ int dbDelete(MYSQL *connection, int dType, cJSON *data) {
         printf("\nDados excluídos com sucesso!\n");
         return 1;
     }   
-
-
 }
