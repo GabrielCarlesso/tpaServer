@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mysql.h>
-//#include <time.h>
+#include "cJSON.h"
+#include "cJSON.c"
 #include <string.h>
 
 void errorMsg(MYSQL *connection) {
@@ -35,7 +36,6 @@ MYSQL * getConnection(){
     return conexao;
 }
 
-// cJSON *dataArray
 int dbWrite(MYSQL *connection, int wType, cJSON *data){
 
     char query[250];
@@ -95,6 +95,9 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
     MYSQL_ROW row;
     char query[250];
     int value;
+    unsigned int num_fields, i;
+    unsigned long *lengths;
+    
 
     // switch utilizado para montagem da query
     switch (rType) {
@@ -110,7 +113,12 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
         case 3:
             sprintf(query, "SELECT id FROM device WHERE userID = %i AND MAC = '%s';", 
                 cJSON_GetObjectItem(data, "userID")->valueint, 
-                cJSON_GetObjectItem(data, "MAC")->valuestring);  
+                cJSON_GetObjectItem(data, "MAC")->valuestring);
+            break;
+
+        case 4:
+            sprintf(query, "SELECT name, email FROM user WHERE id = %i;", cJSON_GetObjectItem(data, "userID")->valueint);
+            break;  
     }
     printf("query %s", query);
 
@@ -130,12 +138,55 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
         return 0;
     }
     else {
-        row = mysql_fetch_row(res);
-        value = atoi(row[0]);
-        mysql_free_result(res);
-        return value;
+        if (rType == 2 || rType == 3) {
+            row = mysql_fetch_row(res);
+            value = atoi(row[0]);
+            mysql_free_result(res);
+            return value;
+        }
+        else{
+            num_fields = mysql_num_fields(res);
+            
+            while ((row = mysql_fetch_row(res))) {
+                lengths = mysql_fetch_lengths(res);
+                
+                for(i = 0; i < num_fields; i++) {
+                    //printf("[%.*s] ", (int) lengths[i], row[i] ? row[i] : "NULL");
+                    cJSON_AddStringToObject(data, mysql_fetch_field(res)->name, row[i] ? row[i] : "NULL");
+                }
+                //printf("\n");
+            }
+        }
     }
     
     mysql_free_result(res);
     return (-1);
+}
+
+int dbDelete(MYSQL *connection, int dType, cJSON *data) {
+
+    char query[250];
+
+    switch (dType) {
+
+        case 1:
+            sprintf(query, "DELETE FROM user WHERE id = %d;", cJSON_GetObjectItem(data, "userID")->valueint);
+            break;
+    }
+
+    printf("%s\n", query);
+
+    if (mysql_query(connection, query)) {
+
+        printf("\nErro ao excluir do banco de dados!\n");
+        errorMsg(connection);
+        return 0;
+    }
+    else {
+
+        printf("\nDados excluídos com sucesso!\n");
+        return 1;
+    }   
+
+
 }
