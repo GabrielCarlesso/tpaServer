@@ -119,6 +119,16 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
         case 4:
             sprintf(query, "SELECT name, email FROM user WHERE id = %i;", cJSON_GetObjectItem(data, "userID")->valueint);
             break;  
+
+        case 5:
+            sprintf(query, "SELECT MAC FROM device WHERE userID = %i;", cJSON_GetObjectItem(data, "userID")->valueint);
+            break;
+
+        case 6:
+            sprintf(query, "SELECT id FROM user WHERE email = '%s' and password = '%s';", 
+                cJSON_GetObjectItem(data, "email")->valuestring,
+                cJSON_GetObjectItem(data, "password")->valuestring);
+            break;
     }
     printf("query %s", query);
 
@@ -138,7 +148,7 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
         return 0;
     }
     else {
-        if (rType == 2 || rType == 3) {
+        if ((rType == 2) || (rType == 3) || (rType == 6)) {
             row = mysql_fetch_row(res);
             value = atoi(row[0]);
             mysql_free_result(res);
@@ -171,6 +181,10 @@ int dbDelete(MYSQL *connection, int dType, cJSON *data) {
 
         case 1:
             sprintf(query, "DELETE FROM user WHERE id = %d;", cJSON_GetObjectItem(data, "userID")->valueint);
+            break;
+
+        case 2:
+            sprintf(query, "DELETE FROM device WHERE MAC = '%s';", cJSON_GetObjectItem(data, "MAC")->valuestring);
             break;
     }
 
