@@ -53,7 +53,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
 
                 switch(method[0]) {
 
-                    case 'G': // GET
+                    case 'G': // GET - Obtém informações do usuário 
 
                         if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
                             
@@ -135,23 +135,101 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
 
                 switch(method[0]) {
 
-                    case 'G': //GET
-                        printf("get all devices from user.id\n");
-                        mg_http_reply(c, 200, "", "{\"result\": \"GETEI a data\"}\n");
+                    case 'G': //GET obtém o MAC de todos os dispositivos do usuário
+                        
+                        if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
+                            
+                            // verifica qual usuário possui o token informado
+                            id = dbRead(dbConnection, 2, root);
+                        
+                            if (id != 0) {
 
+                                cJSON_AddNumberToObject(root, "userID", id);
+
+                                // consulta os dados do usuário
+                                if (dbRead(dbConnection, 5, root) != 0) {
+                                    cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
+                                    cJSON_DeleteItemFromObjectCaseSensitive(root, "userID");
+                                    jsonString = cJSON_Print(root);
+                                    mg_http_reply(c, 200, "Content-Type: application/json", jsonString);
+                                    free(jsonString);
+                                }
+                                else {
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Usuário não encontrado!\"}\n");
+                                }
+                            }
+                            else {
+                                mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
+                            }
+                        }
+                        
                         cJSON_Delete(root);
                         break;
                 }
             }
-            else if(mg_http_match_uri(hm, "/api/device")) {
+            // rota --- /api/user/login
+            else if (mg_http_match_uri(hm, "/api/user/login")) {
+
+                switch(method[0]) {
+
+                    case 'G': //GET verifica se o email e senha estão corretos
+                        
+                        if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
+                            
+                            // verifica qual usuário possui o token informado
+                            id = dbRead(dbConnection, 2, root);
+                        
+                            if (id != 0) {
+
+                                // consulta os dados do usuário
+                                if (dbRead(dbConnection, 6, root) == id) {
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Login efetuado com sucesso!\"}\n");
+                                    
+                                }
+                                else {
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Dados incorretos!\"}\n");
+                                }
+                            }
+                            else {
+                                mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
+                            }
+                        }
+                        
+                        cJSON_Delete(root);
+                        break;
+                }
+
+            }
+            //rota --- /api/device
+            else if (mg_http_match_uri(hm, "/api/device")) {
 
                 switch(method[0]) {
                     
                     case 'D':   // delete device
-                        cJSON_Delete(root);
-                        break;
-                    
-                    case 'G':   // get device info
+
+                        if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
+                            
+                            // verifica qual usuário possui o token informado
+                            id = dbRead(dbConnection, 2, root);
+                        
+                            if (id != 0) {
+
+                                cJSON_AddNumberToObject(root, "userID", id);
+
+                                // consulta os dados do usuário
+                                if (dbDelete(dbConnection, 2, root) != 0) {
+                                    
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Dispositivo excluído com sucesso.\"}\n");
+                                }
+                                else {
+                                    mg_http_reply(c, 200, "", "{\"result\": \"Falha ao excluir dispositivo.\"}\n");
+                                }
+                            }
+                            else {
+                                mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado.\"}\n");
+                            }
+                        }
+
                         cJSON_Delete(root);
                         break;
                     
