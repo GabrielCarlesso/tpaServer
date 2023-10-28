@@ -3,9 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mysql.h>
+#include <string.h>
+#include "mongoose.h"
+#include "mongoose.c"
 #include "cJSON.h"
 #include "cJSON.c"
-#include <string.h>
 
 void errorMsg(MYSQL *connection) {
     fprintf(stderr, "\n%s\n", mysql_error(connection));
@@ -61,17 +63,17 @@ int dbWrite(MYSQL *connection, int wType, cJSON *data){
 
         // data register (deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz)
         case 3:
-            sprintf(query, "INSERT INTO data(deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz) VALUES ('%i', '%s', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f');", 
+            sprintf(query, "INSERT INTO data(deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz) VALUES ('%i', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');", 
                 cJSON_GetObjectItem(data, "deviceID")->valueint,
                 cJSON_GetObjectItem(data, "dateTime")->valuestring,
-                cJSON_GetObjectItem(data, "longitude")->valuedouble,
-                cJSON_GetObjectItem(data, "latitude")->valuedouble,
-                cJSON_GetObjectItem(data, "acx")->valuedouble,
-                cJSON_GetObjectItem(data, "acy")->valuedouble,
-                cJSON_GetObjectItem(data, "acz")->valuedouble,
-                cJSON_GetObjectItem(data, "gyx")->valuedouble,
-                cJSON_GetObjectItem(data, "gyy")->valuedouble,
-                cJSON_GetObjectItem(data, "gyz")->valuedouble);
+                cJSON_GetObjectItem(data, "longitude")->valuestring,
+                cJSON_GetObjectItem(data, "latitude")->valuestring,
+                cJSON_GetObjectItem(data, "acx")->valuestring,
+                cJSON_GetObjectItem(data, "acy")->valuestring,
+                cJSON_GetObjectItem(data, "acz")->valuestring,
+                cJSON_GetObjectItem(data, "gyx")->valuestring,
+                cJSON_GetObjectItem(data, "gyy")->valuestring,
+                cJSON_GetObjectItem(data, "gyz")->valuestring);
             break;
     }
 
@@ -93,7 +95,9 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
 
     MYSQL_RES *res;
     MYSQL_ROW row;
+    MYSQL_FIELD *current_field, *fields;
     char query[250];
+    char *field_name, *field_value;
     int value;
     unsigned int num_fields, i;
     unsigned long *lengths;
@@ -129,6 +133,16 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
                 cJSON_GetObjectItem(data, "email")->valuestring,
                 cJSON_GetObjectItem(data, "password")->valuestring);
             break;
+        
+        /* case 7:
+            break; */
+
+        case 8:
+            sprintf(query, "SELECT dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz FROM data WHERE deviceID = %i;", cJSON_GetObjectItem(data, "deviceID")->valueint);
+            //sprintf(query, "SELECT * FROM data WHERE deviceID = %i;", cJSON_GetObjectItem(data, "deviceID")->valueint);
+            break;
+        
+
     }
     printf("query %s", query);
 
@@ -140,31 +154,49 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
 
     printf("\nConsulta realizada com sucesso!\n");
     
-    res = mysql_store_result(connection);
+    res = mysql_use_result(connection);
+
+    printf("depois use/store result\n");
     
     if (res == NULL) {
+        printf("res = NULL\n");
         errorMsg(connection);
         mysql_free_result(res);
         return 0;
     }
     else {
         if ((rType == 2) || (rType == 3) || (rType == 6)) {
+            printf("if rtype\n");
             row = mysql_fetch_row(res);
+            printf("depois fetch row\n");
             value = atoi(row[0]);
             mysql_free_result(res);
             return value;
         }
-        else{
+        else {
+            //printf("antes num fields\n");
             num_fields = mysql_num_fields(res);
+            //num_fields = mysql_field_count(connection);
+            //printf("num fields: %i\n", num_fields);
+            //current_field = mysql_fetch_field(res);
+            fields = mysql_fetch_fields(res);
             
             while ((row = mysql_fetch_row(res))) {
-                lengths = mysql_fetch_lengths(res);
+                //lengths = mysql_fetch_lengths(res);
                 
-                for(i = 0; i < num_fields; i++) {
-                    //printf("[%.*s] ", (int) lengths[i], row[i] ? row[i] : "NULL");
-                    cJSON_AddStringToObject(data, mysql_fetch_field(res)->name, row[i] ? row[i] : "NULL");
+                for (i = 0; i < num_fields; i++) {
+                    //field_name = current_field->name;
+                    field_name = fields[i].name;
+                    field_value = row[i] ? row[i] : "NULL";
+                    
+                    printf("[%s : %s] ", field_name, field_value);
+                    
+                    if(cJSON_AddStringToObject(data, field_name, field_value) == NULL){
+                        printf("Erro ao adicionar ao objeto cJSON.\n");
+                    }
                 }
-                //printf("\n");
+                printf("\n");
+                
             }
         }
     }
