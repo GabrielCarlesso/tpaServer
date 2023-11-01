@@ -101,6 +101,8 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
     int value;
     unsigned int num_fields, i;
     unsigned long *lengths;
+    cJSON *dataArray;
+    cJSON *rowObject;
     
 
     // switch utilizado para montagem da query
@@ -166,38 +168,38 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
     }
     else {
         if ((rType == 2) || (rType == 3) || (rType == 6)) {
-            printf("if rtype\n");
             row = mysql_fetch_row(res);
-            printf("depois fetch row\n");
             value = atoi(row[0]);
             mysql_free_result(res);
             return value;
         }
         else {
-            //printf("antes num fields\n");
             num_fields = mysql_num_fields(res);
-            //num_fields = mysql_field_count(connection);
-            //printf("num fields: %i\n", num_fields);
-            //current_field = mysql_fetch_field(res);
+            
             fields = mysql_fetch_fields(res);
+
+            dataArray = cJSON_CreateArray();
             
             while ((row = mysql_fetch_row(res))) {
                 //lengths = mysql_fetch_lengths(res);
-                
+                rowObject = cJSON_CreateObject();
+
                 for (i = 0; i < num_fields; i++) {
-                    //field_name = current_field->name;
+
                     field_name = fields[i].name;
                     field_value = row[i] ? row[i] : "NULL";
                     
-                    printf("[%s : %s] ", field_name, field_value);
+                    //printf("[%s : %s] ", field_name, field_value);
                     
-                    if(cJSON_AddStringToObject(data, field_name, field_value) == NULL){
-                        printf("Erro ao adicionar ao objeto cJSON.\n");
+                    if(cJSON_AddStringToObject(rowObject, field_name, field_value) == NULL){
+                        printf("Erro ao adicionar ao objeto cJSON rowObject.\n");
                     }
                 }
+                cJSON_AddItemToArray(dataArray, rowObject);
                 printf("\n");
                 
             }
+            cJSON_AddItemToObject(data, "rows", dataArray);
         }
     }
     
