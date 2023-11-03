@@ -67,7 +67,8 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                     cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
                                     cJSON_DeleteItemFromObjectCaseSensitive(root, "userID");
                                     char *jsonString = cJSON_Print(cJSON_GetObjectItem(root, "rows"));
-                                    mg_http_reply(c, 200, "Content-Type: application/json", jsonString);
+                                    //mg_http_reply(c, 200, "Content-Type: application/json", jsonString);
+                                    mg_http_reply(c, 200, "", jsonString);
                                     free(jsonString);
                                 }
                                 else {
@@ -93,7 +94,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                             char jsonString[50] = "";
                             sprintf(jsonString, "{\"token\": \"%s\"}", tokenStr);
                             printf("%s\n", jsonString);
-                            cJSON_Delete(root);
+                            //cJSON_Delete(root);
                             mg_http_reply(c, 200, "", jsonString);
                             //sucesso, reply token
                         }
@@ -151,7 +152,8 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                     cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
                                     cJSON_DeleteItemFromObjectCaseSensitive(root, "userID");
                                     char *jsonString = cJSON_Print(root);
-                                    mg_http_reply(c, 200, "Content-Type: application/json", jsonString);
+                                    printf("%s\n", jsonString);
+                                    mg_http_reply(c, 200, "", jsonString);
                                     free(jsonString);
                                 }
                                 else {
@@ -271,6 +273,46 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
 
                         if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
                             
+                            // verifica qual usuário possui o token informado
+                            id = dbRead(dbConnection, 2, root);
+                        
+                            if (id != 0) {
+
+                                cJSON_AddNumberToObject(root, "userID", id);
+
+                                // verifica qual dispositivo possui o MAC informado
+                                deviceID = dbRead(dbConnection, 3, root);
+
+                                printf("device ID: %i\n", deviceID);
+                                if (deviceID != 0) {
+
+                                    cJSON_AddNumberToObject(root, "deviceID", deviceID);
+
+                                    // todos os dados do dispositivo
+                                    //printf("vou executar dbRead 8\n");
+                                    if (dbRead(dbConnection, 8, root) != 0) {
+                                        cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
+                                        cJSON_DeleteItemFromObjectCaseSensitive(root, "MAC");
+                                        cJSON_DeleteItemFromObjectCaseSensitive(root, "deviceID");
+                                        cJSON_DeleteItemFromObjectCaseSensitive(root, "userID");
+
+                                        char *jsonString = cJSON_Print(root);
+                                        //printf("%s\n",jsonString);
+                                        mg_http_reply(c, 200, "", jsonString);
+                                        free(jsonString);
+                                    }  
+                                }
+                            }
+                            else {
+                                mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
+                            }
+                        }
+                        break;
+                    
+                    // 
+                    case 'D':
+
+                        if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
                             
                             // verifica qual usuário possui o token informado
                             id = dbRead(dbConnection, 2, root);
@@ -287,30 +329,13 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
 
                                     cJSON_AddNumberToObject(root, "deviceID", deviceID);
 
-                                    if (cJSON_GetObjectItem(root, "fromDate") != NULL) {
-                                    // busca por data
-                                        printf("cai no fromdate\n");
+                                    // exclui todos os dados do dispositivo
+                                    
+                                    if(dbDelete(dbConnection, 3, root) == 1){
+                                        mg_http_reply(c, 200, "", "{\"result\": \"Dados excluídos com sucesso!\"}\n");
                                     }
-                                    else {
-                                        
-                                        // todos os dados do dispositivo
-                                        //printf("vou executar dbRead 8\n");
-                                        if (dbRead(dbConnection, 8, root) != 0) {
-                                            cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
-                                            cJSON_DeleteItemFromObjectCaseSensitive(root, "MAC");
-
-                                            //printf("%i array size\n", cJSON_GetArraySize(root));
-                                            arrayItem = cJSON_GetObjectItem(root, "rows");
-
-                                            printf("%i array size\n", cJSON_GetArraySize(arrayItem));
-                                            
-                                            //usar cjson is null, while, jogar pro cjson auxiliar e reply
-                                            char *jsonString = cJSON_Print(arrayItem);
-                                            printf("jsonstring: %s\n", jsonString);
-                                            mg_http_reply(c, 200, "Content-Type: application/json", jsonString);
-                                            free(jsonString);
-                                        }
-                                        //free(jsonString);
+                                    else{
+                                        mg_http_reply(c, 200, "", "{\"result\": \"Falha ao excluir os dados!\"}\n");
                                     }
                                 }
                             }
@@ -318,12 +343,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
                             }
                         }
-                        
-                        cJSON_Delete(aux);
-                        break;
-                    
-                    // 
-                    case 'D':
                         break;
 
                     // data register
@@ -364,8 +383,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         break;
                 }
             }
-
-            printf("cJSON deletes\n");
+            cJSON_Delete(root);
         }
     }
 }

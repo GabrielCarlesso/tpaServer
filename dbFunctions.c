@@ -220,6 +220,10 @@ int dbDelete(MYSQL *connection, int dType, cJSON *data) {
         case 2:
             sprintf(query, "DELETE FROM device WHERE MAC = '%s';", cJSON_GetObjectItem(data, "MAC")->valuestring);
             break;
+        
+        case 3:
+            sprintf(query, "DELETE FROM data WHERE deviceID = %d;", cJSON_GetObjectItem(data, "deviceID")->valueint);
+            break;
     }
 
     printf("%s\n", query);
