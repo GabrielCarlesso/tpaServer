@@ -67,7 +67,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                     cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
                                     cJSON_DeleteItemFromObjectCaseSensitive(root, "userID");
                                     char *jsonString = cJSON_Print(cJSON_GetObjectItem(root, "rows"));
-                                    //mg_http_reply(c, 200, "Content-Type: application/json", jsonString);
                                     mg_http_reply(c, 200, "", jsonString);
                                     free(jsonString);
                                 }
@@ -79,8 +78,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
                             }
                         }
-                        
-                        cJSON_Delete(root);
                         break;
                     
                     case 'P': // POST - Registrar usuário
@@ -94,9 +91,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                             char jsonString[50] = "";
                             sprintf(jsonString, "{\"token\": \"%s\"}", tokenStr);
                             printf("%s\n", jsonString);
-                            //cJSON_Delete(root);
                             mg_http_reply(c, 200, "", jsonString);
-                            //sucesso, reply token
                         }
                         else{
                             mg_http_reply(c, 200, "", "{\"result\": \"Já existe usuário registrado com o email informado!\"}\n");
@@ -127,7 +122,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado.\"}\n");
                             }
                         }
-
                         break;
                 }
             }
@@ -185,7 +179,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 // consulta os dados do usuário
                                 if (dbRead(dbConnection, 6, root) == id) {
                                     mg_http_reply(c, 200, "", "{\"result\": \"Login efetuado com sucesso!\"}\n");
-                                    
                                 }
                                 else {
                                     mg_http_reply(c, 200, "", "{\"result\": \"Dados incorretos!\"}\n");
@@ -196,6 +189,40 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                             }
                         }
                         
+                        break;
+                }
+
+            }
+            //rota --- /api/user/coordinates
+            else if(mg_http_match_uri(hm, "/api/user/coordinates")){
+
+                switch(method[0]) {
+                    
+                    case 'P': // post de coordenadas para cercamento virtual
+
+                        if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {
+                            
+                            // verifica qual usuário possui o token informado
+                            id = dbRead(dbConnection, 2, root);
+                        
+                            if (id != 0) {
+
+                                if (cJSON_GetObjectItem(root, "coordinates")->valuestring != NULL){
+
+                                    // insere os dados no banco
+                                    if(dbWrite(dbConnection, 4, root) == 1){
+                                        mg_http_reply(c, 200, "", "{\"result\": \"Coordenadas registradas com sucesso!\"}\n");
+                                    }
+                                    else {
+                                        mg_http_reply(c, 200, "", "{\"result\": \"Coordenadas já armazenadas anteriormente!\"}\n");
+                                    }
+
+                                }
+                            }
+                            else {
+                                mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
+                            }
+                        }
                         break;
                 }
 
@@ -229,7 +256,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado.\"}\n");
                             }
                         }
-
                         break;
                     
                     case 'P':   // device register
@@ -240,8 +266,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                             id = dbRead(dbConnection, 2, root);
                         
                             if(id != 0){
-
-                                printf("leu id: %i\n", id);
                             
                                 cJSON_AddNumberToObject(root, "userID", id);
 
@@ -260,7 +284,6 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         else {
                             mg_http_reply(c, 200, "", "{\"result\": \"Token nulo!\"}\n");
                         }
-                        
                         break;
                 }
             }
@@ -289,15 +312,13 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                     cJSON_AddNumberToObject(root, "deviceID", deviceID);
 
                                     // todos os dados do dispositivo
-                                    //printf("vou executar dbRead 8\n");
-                                    if (dbRead(dbConnection, 8, root) != 0) {
+                                    if (dbRead(dbConnection, 7, root) != 0) {
                                         cJSON_DeleteItemFromObjectCaseSensitive(root, "token");
                                         cJSON_DeleteItemFromObjectCaseSensitive(root, "MAC");
                                         cJSON_DeleteItemFromObjectCaseSensitive(root, "deviceID");
                                         cJSON_DeleteItemFromObjectCaseSensitive(root, "userID");
 
                                         char *jsonString = cJSON_Print(root);
-                                        //printf("%s\n",jsonString);
                                         mg_http_reply(c, 200, "", jsonString);
                                         free(jsonString);
                                     }  
@@ -309,7 +330,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         }
                         break;
                     
-                    // 
+                    // Deleta todos os dados referentes ao dispositivo
                     case 'D':
 
                         if (cJSON_GetObjectItem(root, "token")->valuestring != NULL) {

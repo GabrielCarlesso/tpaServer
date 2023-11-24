@@ -45,23 +45,23 @@ int dbWrite(MYSQL *connection, int wType, cJSON *data){
     // wType representa o tipo de escrita a ser feita
     switch (wType){
         
-        // user register (name, email, password, token)
+        // registro de usuário (name, email, password, token)
         case 1:
-            sprintf(query, "INSERT INTO user(name, email, password, token) VALUES ('%s', '%s', '%s', '%d');", 
+            sprintf(query, "INSERT INTO user(name, email, password, token) VALUES ('%s', '%s', '%s', '%s');", 
                 cJSON_GetObjectItem(data, "name")->valuestring, 
                 cJSON_GetObjectItem(data, "email")->valuestring, 
                 cJSON_GetObjectItem(data, "password")->valuestring,
-                cJSON_GetObjectItem(data, "token")->valueint);
+                cJSON_GetObjectItem(data, "token")->valuestring);
             break;
     
-        // device register (MAC, user.id)
+        // registro de dispositivo (MAC, user.id)
         case 2:
             sprintf(query, "INSERT INTO device(MAC, userID) VALUES ('%s', '%i');",
                 cJSON_GetObjectItem(data, "MAC")->valuestring,
                 cJSON_GetObjectItem(data, "userID")->valueint);
             break;
 
-        // data register (deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz)
+        // registro de dados (deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz)
         case 3:
             sprintf(query, "INSERT INTO data(deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz) VALUES ('%i', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');", 
                 cJSON_GetObjectItem(data, "deviceID")->valueint,
@@ -74,6 +74,12 @@ int dbWrite(MYSQL *connection, int wType, cJSON *data){
                 cJSON_GetObjectItem(data, "gyx")->valuestring,
                 cJSON_GetObjectItem(data, "gyy")->valuestring,
                 cJSON_GetObjectItem(data, "gyz")->valuestring);
+            break;
+
+        // registro de coordenadas para cercamento virtual
+        case 4:
+            sprintf(query, "UPDATE user SET vfCoordinates = '%s' WHERE token = '%s';", cJSON_GetObjectItem(data, "coordinates")->valuestring,
+                cJSON_GetObjectItem(data, "token")->valuestring);
             break;
     }
 
@@ -123,7 +129,7 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
             break;
 
         case 4:
-            sprintf(query, "SELECT name, email FROM user WHERE id = %i;", cJSON_GetObjectItem(data, "userID")->valueint);
+            sprintf(query, "SELECT name, email, vfCoordinates FROM user WHERE id = %i;", cJSON_GetObjectItem(data, "userID")->valueint);
             break;  
 
         case 5:
@@ -136,14 +142,9 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
                 cJSON_GetObjectItem(data, "password")->valuestring);
             break;
         
-        /* case 7:
-            break; */
-
-        case 8:
+        case 7:
             sprintf(query, "SELECT dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz FROM data WHERE deviceID = %i;", cJSON_GetObjectItem(data, "deviceID")->valueint);
-            //sprintf(query, "SELECT * FROM data WHERE deviceID = %i;", cJSON_GetObjectItem(data, "deviceID")->valueint);
             break;
-        
 
     }
     printf("query %s", query);
@@ -157,8 +158,6 @@ int dbRead(MYSQL *connection, int rType, cJSON *data) {
     printf("\nConsulta realizada com sucesso!\n");
     
     res = mysql_use_result(connection);
-
-    printf("depois use/store result\n");
     
     if (res == NULL) {
         printf("res = NULL\n");
@@ -218,7 +217,7 @@ int dbDelete(MYSQL *connection, int dType, cJSON *data) {
             break;
 
         case 2:
-            sprintf(query, "DELETE FROM device WHERE MAC = '%s';", cJSON_GetObjectItem(data, "MAC")->valuestring);
+            sprintf(query, "DELETE FROM device WHERE MAC = '%s' AND userID = %d;", cJSON_GetObjectItem(data, "MAC")->valuestring, cJSON_GetObjectItem(data, "userID")->valueint);
             break;
         
         case 3:
