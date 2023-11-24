@@ -9,8 +9,10 @@ Código-fonte do servidor:  mg_http_RESTful_server.c
 Para Ubuntu:
 1 - Incluir os arquivos mysql.h, cJSON.c, cJSON.h, mongoose.c e mongoose.h no mesmo diretório do código fonte.
 
+
 2 - Instalar o XAMPP para utilizar o MySQL
     https://www.apachefriends.org/pt_br/index.html
+
 
 3 - Instalar o MySQL Connector C no Ubuntu
     sudo apt update
@@ -25,15 +27,25 @@ Para Ubuntu:
            ./server
 
 4 - Acessar pasta de instalação do XAMPP (meu caso: Computador/opt/lampp)
+
+
 5 - Executar o XAMPP: 
       sudo ./manager-linux-x64.run
+
+      
 6 - Dar Start no Apache Web Server e MySQL Database
+
+
 7 - Acessar o Web Server http://localhost/phpmyadmin/
+
+
 8 - Importar o banco de dados disp_rastreador.sql
+
 
 9 - compilar e rodar o servidor:
     gcc -o server mg_http_RESTful_server.c -I/usr/include/mysql -lmysqlclient
     ./server
+
 
 10 - testar utilizando Postman / ESP / aplicativo
 
