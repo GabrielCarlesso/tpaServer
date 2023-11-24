@@ -17,13 +17,13 @@ Para Ubuntu:
 3 - Instalar o MySQL Connector C no Ubuntu
 
 
-    sudo apt update
+   ** sudo apt update
 
     
-    sudo apt upgrade
+   ** sudo apt upgrade
 
     
-    sudo apt install libmysqlclient-dev
+  ** sudo apt install libmysqlclient-dev
 
 
     ** se necessitar, descompacte tar.gz do mysql connector no diretório do servidor, depois inclua na linha de compilação
