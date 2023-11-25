@@ -1,0 +1,199 @@
+Definição de rotas, exemplos de msg do cliente para teste (Postman), exemplos de msg de retorno:
+
+
+POST http://127.0.0.1:8000/api/user
+	exemplo
+	
+	body: 
+	{
+    	"name":"Guilherme Kraemer",
+    	"email":"gkraemer@ecomp.ufsm.br",
+    	"password":"1asdsd5678"
+	}
+	
+	registra um novo usuário, se não houver outro com o mesmo e-mail
+	retorna o token do usuário que deve ser armazenado e disponibilizado no dispositivo que registrou o usuário, também deve 
+	ser passado manualmente para o firmware do embarcado
+	
+	{
+    	"token": "792386446"
+	}
+	
+GET http://127.0.0.1:8000/api/user
+	exemplo
+	
+	body:
+	{
+    	"token":"792386446"
+	}
+	
+	retorna informações do próprio usuário
+	[
+    		{
+        	"name": "Guilherme Kraemer",
+        	"email": "gkraemer2023@ecomp.ufsm.br",
+        	"vfCoordinates": "0"
+    		}
+	]
+	
+DELETE http://127.0.0.1:8000/api/user
+	exemplo
+	
+	body:
+	{
+    	"token":"792386446"
+	}
+	
+	exclui em cascata a conta do usuário, seus dispositivos e todos os dados associados
+	
+	{
+    	"result": "Usuário excluído com sucesso."
+	}
+	
+GET http://127.0.0.1:8000/api/user/device
+	exemplo
+	
+	body:
+	{
+    	"token":"840526687"
+	}
+	
+	retorna o MAC de todos os dispositivos registrados nessa conta de usuário
+	
+	{
+    	"rows": [
+        		{
+            			"MAC": "00:1B:44:11:3A:B7"
+        		},
+        		{
+            			"MAC": "11:1B:44:11:3A:B7"
+        		}
+   		 ]
+	}
+	
+GET http://127.0.0.1:8000/api/user/login
+	exemplo
+	
+	body:
+	{
+    	"token":"840526687",
+    	"email":"guilherme.kraemer@ecomp.ufsm.br",
+    	"password":"12345678"
+	}
+	
+	verifica o id do usuário que possui esse token, depois verifica o id do usuário que possui o email e password passados, se forem iguais, confirma o login
+	
+	{
+    	"result": "Login efetuado com sucesso!"
+	}
+	
+POST http://127.0.0.1:8000/api/device
+	exemplo
+	
+	body:
+	{
+   	 "token":"840526687",
+    	"MAC":"45:1B:44:11:3A:B7"
+	}
+	
+	registra um dispositivo se o MAC não for repetido
+	
+	{
+   	 "result": "Dispositivo registrado com sucesso!"
+	}
+	
+DELETE http://127.0.0.1:8000/api/device
+	exemplo
+	
+	{
+    	"token":"840526687",
+    	"MAC":"47:1B:44:11:3A:B7"
+	}
+	
+	exclui o dispositivo e em cascata os dados associados a ele
+	
+	{
+    	"result": "Dispositivo excluído com sucesso."
+	}
+	
+POST http://127.0.0.1:8000/api/data
+	exemplo
+	
+	{
+    	"token":"840526687",
+    	"MAC":"00:1B:44:11:3A:B7",
+    	"dateTime":"2022-04-22 10:34:23.55",
+    	"longitude":"100.0",
+    	"latitude":"150.0",
+    	"acx":"25.4",
+    	"acy":"56.8",
+    	"acz":"32.9",
+    	"gyx":"77.2",
+    	"gyy":"89.1",
+    	"gyz":"27.7"
+	}
+	
+	registra dados do dispositivo
+	
+	{
+    	"result": "Dados registrados com sucesso!"
+	}
+	
+GET http://127.0.0.1:8000/api/data
+	exemplo
+	
+	{
+    	"token":"840526687",
+    	"MAC":"00:1B:44:11:3A:B7"
+	}
+	
+	obtém os dados do dispositivo
+	
+	{
+    	"rows": [
+        	{
+            	"dateTime": "2022-04-22 10:34:23.55",
+            	"longitude": "100.0",
+            	"latitude": "150.0",
+            	"acx": "25.4",
+            	"acy": "56.8",
+            	"acz": "32.9",
+            	"gyx": "77.2",
+            	"gyy": "89.1",
+            	"gyz": "27.7"
+        	}
+    	]
+	}
+	
+DELETE http://127.0.0.1:8000/api/data
+	exemplo
+	
+	{
+    	"token":"840526687",
+    	"MAC":"00:1B:44:11:3A:B7"
+	}
+	
+	exclui os dados do dispositivo
+	
+	{
+    	"result": "Dados excluídos com sucesso!"
+	}
+	
+POST http://127.0.0.1:8000/api/user/coordinates
+	exemplo
+	
+	{
+    	"token":"840526687",
+    	"coordinates":"-30.11642, -51.33490, -30.10636, -51.33979, 30.10893, -51.34276"
+	}
+	
+	registra coordenadas para cercamento virtual (máx 125 caracteres, pode ser ajustado no banco de dados)
+	todos os valores são strings, formato pode ser decidido no front. No exemplo: "coordinates" : "lat1, long1, lat2, long2, lat3, long3"
+	pode-se usar funções como strtoken para quebrar a string a cada virgula...
+	
+	{
+    	"result": "Coordenadas registradas com sucesso!"
+	}
+	
+			
+
