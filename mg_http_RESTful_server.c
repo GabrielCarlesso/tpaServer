@@ -8,29 +8,15 @@ long int generateToken();
 MYSQL *dbConnection;
 
 static const char *s_http_addr = "http://127.0.0.1:8000";    // HTTP port
-static const char *s_https_addr = "https://127.0.0.1:443";  // HTTPS port
-static const char *s_root_dir = "."; // diretório raiz onde os arquivos estáticos estão
 
-// We use the same event handler function for HTTP and HTTPS connections
+
 // The function is called every time an event happens
-// fn_data is NULL for plain HTTP, and non-NULL for HTTPS
 
 static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *fn_data) {
     
-    if(ev == MG_EV_ACCEPT && fn_data != NULL) { // Identifies HTTPS connection
-        
-        // Defines communication security options (TLS/SSL Protocol)
-        struct mg_tls_opts opts = {
-            //.ca = "ca.pem",         // Uncomment to enable two-way SSL
-            .cert = "server.pem",     // (Certificate PEM file) OR (Path to the PEM file containing the server's certificate)
-            //.certkey = "server.pem",  // (This PEM contains both cert and key) OR (Path to the PEM file containing both the server's certificate and private key.)
-        };
-        mg_tls_init(c, &opts); // Set the connection's configuration to use TLS/SSL 
-    } 
-    else if(ev == MG_EV_HTTP_MSG) { // Identifies HTTP connection
+    if(ev == MG_EV_HTTP_MSG) { // Identifies HTTP connection
         
         struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-        //struct mg_str *token = mg_http_get_header(hm, "Authorization");
         const char *method = hm->method.ptr;
         char tokenStr[32];
         int i, id, deviceID;
@@ -46,8 +32,12 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
         } 
         else {
 
+            if (method[1] == 'U' || method[1] == 'A') { // PUT e PATCH indisponíveis
+                mg_http_reply(c, 200, "", "{\"result\": \"Método indisponível.\"}\n");
+            }
+
             //rota --- /api/user
-            if(mg_http_match_uri(hm, "/api/user")) {
+            else if(mg_http_match_uri(hm, "/api/user")) {
 
                 switch(method[0]) {
 
@@ -81,7 +71,7 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         break;
                     
                     case 'P': // POST - Registrar usuário
-                        
+
                         // converte o token em uma string e adiciona ao objeto cJSON root
                         snprintf(tokenStr, sizeof(tokenStr), "%ld", generateToken());
                         cJSON_AddStringToObject(root, "token", tokenStr);
@@ -123,6 +113,10 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                             }
                         }
                         break;
+
+                    default:
+                        mg_http_reply(c, 200, "", "{\"result\": \"Método indisponível.\"}\n");
+                        break;
                 }
             }
             //rota --- /api/user/device
@@ -158,7 +152,10 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
                             }
                         }
-                        
+                        break;
+                    
+                    default:
+                        mg_http_reply(c, 200, "", "{\"result\": \"Método indisponível.\"}\n");
                         break;
                 }
             }
@@ -188,7 +185,10 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
                             }
                         }
-                        
+                        break;
+                    
+                    default:
+                        mg_http_reply(c, 200, "", "{\"result\": \"Método indisponível.\"}\n");
                         break;
                 }
 
@@ -223,6 +223,10 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                                 mg_http_reply(c, 200, "", "{\"result\": \"Não há usuário com o token informado!\"}\n");
                             }
                         }
+                        break;
+                    
+                    default:
+                        mg_http_reply(c, 200, "", "{\"result\": \"Método indisponível.\"}\n");
                         break;
                 }
 
@@ -284,6 +288,10 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                         else {
                             mg_http_reply(c, 200, "", "{\"result\": \"Token nulo!\"}\n");
                         }
+                        break;
+                    
+                    default:
+                        mg_http_reply(c, 200, "", "{\"result\": \"Método indisponível.\"}\n");
                         break;
                 }
             }
@@ -402,11 +410,21 @@ static void event_handler(struct mg_connection *c, int ev, void *ev_data, void *
                             }
                         }
                         break;
+                    
+                    default:
+                        mg_http_reply(c, 200, "", "{\"result\": \"Método indisponível.\"}\n");
+                        break;
                 }
+            }
+            else {
+                mg_http_reply(c, 200, "", "{\"result\": \"Rota não encontrada.\"}\n");
             }
             cJSON_Delete(root);
         }
     }
+    /* else {
+        mg_http_reply(c, 200, "", "{\"result\": \"Evento desconhecido.\"}\n");
+    } */
 }
 
 // verifica erro no cJSON_Parse()
@@ -434,7 +452,6 @@ int main (void) {
     mg_mgr_init(&mgr);                            // Initialise event manager
     
     mg_http_listen(&mgr, s_http_addr, event_handler, NULL);//(void *) &connection  // Create HTTP listener
-    //mg_http_listen(&mgr, s_https_addr, event_handler, (void *) 1);  // HTTPS listener
     
     for (;;) mg_mgr_poll(&mgr, 1000);                    // Infinite event loop
     mg_mgr_free(&mgr);
