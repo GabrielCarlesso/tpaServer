@@ -7,6 +7,8 @@ Código-fonte do servidor:  mg_http_RESTful_server.c
                            dbFunctions.c
 
 Para Ubuntu:
+
+
 1 - Incluir os arquivos mysql.h, cJSON.c, cJSON.h, mongoose.c e mongoose.h no mesmo diretório do código fonte.
 
 
