@@ -52,7 +52,11 @@ Para Ubuntu:
 
 
 9 - compilar e rodar o servidor:
+
+
     gcc -o server mg_http_RESTful_server.c -I/usr/include/mysql -lmysqlclient
+
+    
     ./server
 
 
