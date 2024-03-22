@@ -63,17 +63,23 @@ int dbWrite(MYSQL *connection, int wType, cJSON *data){
 
         // registro de dados (deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz)
         case 3:
-            sprintf(query, "INSERT INTO data(deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz) VALUES ('%i', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');", 
-                cJSON_GetObjectItem(data, "deviceID")->valueint,
-                cJSON_GetObjectItem(data, "dateTime")->valuestring,
-                cJSON_GetObjectItem(data, "longitude")->valuestring,
-                cJSON_GetObjectItem(data, "latitude")->valuestring,
-                cJSON_GetObjectItem(data, "acx")->valuestring,
-                cJSON_GetObjectItem(data, "acy")->valuestring,
-                cJSON_GetObjectItem(data, "acz")->valuestring,
-                cJSON_GetObjectItem(data, "gyx")->valuestring,
-                cJSON_GetObjectItem(data, "gyy")->valuestring,
-                cJSON_GetObjectItem(data, "gyz")->valuestring);
+            sprintf(query, "INSERT INTO data(deviceID, dateTime, longitude, latitude, acx, acy, acz, gyx, gyy, gyz, magx, magy, magz, roll, pitch, yaw) VALUES ('%i', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');",
+                    cJSON_GetObjectItem(data, "deviceID")->valueint,
+                    cJSON_GetObjectItem(data, "dateTime")->valuestring,
+                    cJSON_GetObjectItem(data, "longitude")->valuestring,
+                    cJSON_GetObjectItem(data, "latitude")->valuestring,
+                    cJSON_GetObjectItem(data, "acx")->valuestring,
+                    cJSON_GetObjectItem(data, "acy")->valuestring,
+                    cJSON_GetObjectItem(data, "acz")->valuestring,
+                    cJSON_GetObjectItem(data, "gyx")->valuestring,
+                    cJSON_GetObjectItem(data, "gyy")->valuestring,
+                    cJSON_GetObjectItem(data, "gyz")->valuestring,
+                    cJSON_GetObjectItem(data, "magx")->valuestring,
+                    cJSON_GetObjectItem(data, "magy")->valuestring,
+                    cJSON_GetObjectItem(data, "magz")->valuestring,
+                    cJSON_GetObjectItem(data, "roll")->valuestring,
+                    cJSON_GetObjectItem(data, "pitch")->valuestring,
+                    cJSON_GetObjectItem(data, "yaw")->valuestring);
             break;
 
         // registro de coordenadas para cercamento virtual
